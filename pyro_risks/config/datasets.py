@@ -133,9 +133,11 @@ CACHE_FOLDER: str = "./.cache/"
 DATA_REGISTRY = os.path.join(CACHE_FOLDER, "data_registry/")
 MODEL_REGISTRY = os.path.join(CACHE_FOLDER, "model_registry/")
 METADATA_REGISTRY = os.path.join(CACHE_FOLDER, "metadata_registry/")
+PREDICTIONS_REGISTRY = os.path.join(CACHE_FOLDER, "predictions_registry/")
 DATASET_PATH = os.path.join(DATA_REGISTRY, DATASET)
 
 os.makedirs(CACHE_FOLDER, exist_ok=True)
 os.makedirs(DATA_REGISTRY, exist_ok=True)
 os.makedirs(MODEL_REGISTRY, exist_ok=True)
 os.makedirs(METADATA_REGISTRY, exist_ok=True)
+os.makedirs(PREDICTIONS_REGISTRY, exist_ok=True)
