@@ -43,10 +43,10 @@ CDS_URL = "https://cds.climate.copernicus.eu/api/v2"
 CDS_UID = os.getenv("CDS_UID")
 CDS_API_KEY = os.getenv("CDS_API_KEY")
 
-RFMODEL_PATH: str = f"{DATA_FALLBACK}/pyrorisk_rfc_111220.pkl"
-RFMODEL_ERA5T_PATH: str = f"{DATA_FALLBACK}/pyrorisk_rfc_era5t_151220.pkl"
-XGBMODEL_PATH: str = f"{DATA_FALLBACK}/pyrorisk_xgb_091220.pkl"
-XGBMODEL_ERA5T_PATH: str = f"{DATA_FALLBACK}/pyrorisk_xgb_era5t_151220.pkl"
+RFMODEL_PATH_FALLBACK: str = f"{DATA_FALLBACK}/pyrorisk_rfc_111220.pkl"
+RFMODEL_ERA5T_PATH_FALLBACK: str = f"{DATA_FALLBACK}/pyrorisk_rfc_era5t_151220.pkl"
+XGBMODEL_PATH_FALLBACK: str = f"{DATA_FALLBACK}/pyrorisk_xgb_091220.pkl"
+XGBMODEL_ERA5T_PATH_FALLBACK: str = f"{DATA_FALLBACK}/pyrorisk_xgb_era5t_151220.pkl"
 
 FWI_VARS = ["fwi", "ffmc", "dmc", "dc", "isi", "bui", "dsr"]
 
@@ -134,7 +134,11 @@ DATA_REGISTRY = os.path.join(CACHE_FOLDER, "data_registry/")
 MODEL_REGISTRY = os.path.join(CACHE_FOLDER, "model_registry/")
 METADATA_REGISTRY = os.path.join(CACHE_FOLDER, "metadata_registry/")
 PREDICTIONS_REGISTRY = os.path.join(CACHE_FOLDER, "predictions_registry/")
+
 DATASET_PATH = os.path.join(DATA_REGISTRY, DATASET)
+PIPELINE_INPUT_PATH = os.path.join(PREDICTIONS_REGISTRY, "pipeline_inputs.csv")
+RFMODEL_ERA5T_PATH = os.path.join(MODEL_REGISTRY, "RF.joblib")
+XGBMODEL_ERA5T_PATH = os.path.join(MODEL_REGISTRY, "XGBOOST.joblib")
 
 os.makedirs(CACHE_FOLDER, exist_ok=True)
 os.makedirs(DATA_REGISTRY, exist_ok=True)
