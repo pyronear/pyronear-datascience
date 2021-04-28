@@ -3,10 +3,6 @@
 # This program is licensed under the GNU Affero General Public License version 3.
 # See LICENSE or go to <https://www.gnu.org/licenses/agpl-3.0.txt> for full license details.
 
-import joblib
-from urllib.request import urlopen
-import xgboost
-
 from pyro_risks import config as cfg
 from pyro_risks.datasets.fwi import get_fwi_data_for_predict
 from pyro_risks.datasets.ERA5 import (
@@ -14,7 +10,15 @@ from pyro_risks.datasets.ERA5 import (
     get_data_era5t_for_predict,
 )
 from pyro_risks.datasets.era_fwi_viirs import process_dataset_to_predict
-from .score_v0 import add_lags
+from urllib.request import urlopen
+from io import BytesIO
+
+import pandas as pd
+import pickle
+import dvc.api
+import joblib
+import os
+
 
 __all__ = ["PyroRisk"]
 
@@ -28,49 +32,79 @@ class PyroRisk(object):
         object ([type])
     """
 
-    def __init__(self, which="RF"):
-        """Load from Github release the trained model. For the moment only RF and XGB are available.
+    def __init__(self, model="RF"):
+        """Load from Github release the trained model. For the moment only RF and XGBOOST are available.
 
         Args:
-            which (str, optional): Can be 'RF' for random forest or 'XGB' for xgboost. Defaults to 'RF'.
+            model (str, optional): Can be 'RF' for random forest or 'XGBOOST' for xgboost. Defaults to 'RF'.
         """
-        if which == "RF":
+        # Replace Path By local Paths
+        self.model = model
+
+        if self.model == "RF":
             self.model_path = cfg.RFMODEL_ERA5T_PATH
-        elif which == "XGB":
+        elif self.model == "XGBOOST":
             self.model_path = cfg.XGBMODEL_ERA5T_PATH
         else:
-            raise ValueError("Model can be only of type RF or XGB")
-        self.model = joblib.load(urlopen(self.model_path))
-        self._model_type = which
+            raise ValueError("Model can be only of type RF or XGBOOST")
 
-    def get_input(self, day):
+    def get_pipeline(self, path=None, destination=None):
+        """[summary]
+
+        Args:
+            path ([type]): [description]
+        """
+        path = self.model_path if path is None else path
+        destination = self.model_path if destination is None else destination
+
+        pipeline = joblib.load(
+            BytesIO(dvc.api.read(path=path, repo=cfg.REPO_DIR, mode="rb"))
+        )
+        joblib.dump(pipeline, destination)
+
+    @staticmethod
+    def get_inputs(day, destination=None):
         """Returns for a given day data to feed into the model.
 
         This makes use of the CDS API to query data for the selected day, add lags and select
         variables used by the model.
 
         Args:
-            day (str): for example '2020-05-05'
+            day (str): '%Y-%m-%d' for example '2020-05-05'
 
         Returns:
             pd.DataFrame
         """
-        model_cols = cfg.MODEL_ERA5T_VARS
+        destination = cfg.PIPELINE_INPUT_PATH if destination is None else destination
         fwi = get_fwi_data_for_predict(day)
         era = get_data_era5t_for_predict(day)
         res_test = process_dataset_to_predict(fwi, era)
         res_test = res_test.rename({"nom": "departement"}, axis=1)
-        # Add lags only for columns on which model was trained on
-        cols_lags = [
-            "_".join(x.split("_")[:-1]) for x in cfg.MODEL_ERA5T_VARS if "_lag" in x
-        ]
-        res_lags = add_lags(res_test, cols_lags)
-        # Select only rows corresponding to day
-        to_predict = res_lags.loc[res_lags["day"] == day]
-        to_predict = to_predict.drop("day", axis=1).set_index("departement")
-        # Some NaN due to the aggregations on departments with only one line (variables with std)
-        to_predict = to_predict.fillna(0)
-        return to_predict[model_cols]
+        res_test.to_csv(destination)
+
+    def load_pipeline(self, path=None):
+
+        path = self.model_path if path is None else path
+
+        if os.path.isfile(path):
+            self.pipeline = joblib.load(path)
+        else:
+            try:
+                self.get_pipeline()
+                self.pipeline = joblib.load(path)
+            except Exception as e:
+                print(e)
+
+    def load_inputs(self, path=None):
+        path = cfg.PIPELINE_INPUT_PATH if path is None else path
+        if os.path.isfile(path):
+            self.input = pd.read_csv(path)
+        else:
+            try:
+                self.get_input()
+                self.input = pd.read_csv(path)
+            except Exception as e:
+                print(e)
 
     def predict(self, day, country="France"):
         """Serves a prediction for the specified day.
@@ -87,11 +121,20 @@ class PyroRisk(object):
             and values probability predictions for label 1 (fire) and feature contributions to predictions
             respectively
         """
-        sample = self.get_input(day)
+
+        self.load_pipeline()
+        self.load_inputs(path)
         if self._model_type == "RF":
-            predictions = self.model.predict_proba(sample.values)
+            predictions = self.pipeline.predict_proba(sample.values)
             res = dict(zip(sample.index, predictions[:, 1].round(3)))
-        elif self._model_type == "XGB":
-            predictions = self.model.predict(xgboost.DMatrix(sample))
+        elif self._model_type == "XGBOOST":
+            predictions = self.pipeline.predict(xgboost.DMatrix(sample))
             res = dict(zip(sample.index, predictions.round(3)))
         return {x: {"score": res[x], "explainability": None} for x in res}
+
+    @staticmethod
+    def get_predictions(day, destination=None):
+        pass
+
+    def expose_predictions(self, day, country="France"):
+        pass
